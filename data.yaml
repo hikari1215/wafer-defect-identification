@@ -1,0 +1,8 @@
+path: /content/Wafer_Project/dataset
+train: images/train
+val: images/val
+
+names:
+  0: particle
+  1: scratch
+  2: pit
