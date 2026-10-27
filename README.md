@@ -1,2 +1,2 @@
 # wafer-defect-identification
-Using YOLOv8 to identify wafer defect (in development)
+Using YOLO26 to identify wafer defect (in development)
