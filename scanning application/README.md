@@ -4,7 +4,12 @@ Ensure you have Python 3.8+ installed along with the core computer vision stack:
 ```bash
 pip install torch torchvision ultralytics opencv-python
 ```
+### 📂 Supported File & Stream Formats
 
+- **Images:** `.jpg`, `.jpeg`, `.png`, `.bmp`, `.webp`, `.tif`, `.tiff`
+- **Videos:** `.mp4`, `.avi`, `.mov`, `.mkv`, `.flv`, `.wmv`
+- **Model Weights:** `.pt` (PyTorch), `.engine` (TensorRT), `.onnx` (ONNX Runtime)
+- **Live Streams:** Webcam Index (`0`, `1`), RTSP / HTTP Streams
 ---
 
 ###  Running Inference (`demo.py`)
