@@ -6,66 +6,58 @@ import cv2
 import torch
 from ultralytics import YOLO
 
-# Các định dạng file được hỗ trợ
+# Supported files
 IMG_FORMATS = ('.jpg', '.jpeg', '.png', '.bmp', '.webp', '.tif', '.tiff')
 VID_FORMATS = ('.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv')
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Script suy luận YOLO hoàn chỉnh - Sạch Warning, hỗ trợ CUDA/CPU, lưu Output & CSV"
-    )
+    parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model",
         type=str,
         default="best.pt",
-        help="Đường dẫn file weights (.pt, .engine, .onnx)",
+        help="Path to model weights",
     )
     parser.add_argument(
         "--source",
         type=str,
         required=True,
-        help="Đường dẫn ảnh, video, thư mục hoặc index camera (ví dụ: 0)",
+        help="Path to source image/folder or webcam index",
     )
     parser.add_argument(
         "--device",
         type=str,
         default="",
-        help="Thiết bị chạy: '0' hoặc 'cuda' cho GPU, 'cpu' cho CPU. Để trống tự chọn.",
+        help="CUDA device ('0' or 'cpu')",
     )
     parser.add_argument(
         "--half",
         action="store_true",
-        help="Bật FP16 (Half Precision) cho GPU CUDA để tăng tốc",
     )
     parser.add_argument(
         "--out-dir",
         type=str,
         default="output",
-        help="Thư mục lưu ảnh/video kết quả và file CSV (Mặc định: output)",
     )
     parser.add_argument(
         "--csv-name",
         type=str,
         default="results.csv",
-        help="Tên file CSV thống kê (Mặc định: results.csv)",
     )
     parser.add_argument(
         "--conf",
         type=float,
         default=0.25,
-        help="Ngưỡng độ tin cậy (Confidence threshold)",
     )
     parser.add_argument(
         "--no-show",
         action="store_true",
-        help="Không hiển thị cửa sổ preview",
     )
     return parser.parse_args()
 
 
 def log_to_csv(csv_path, data_rows):
-    """Ghi hoặc nối dữ liệu nhận diện vào file CSV"""
     file_exists = os.path.exists(csv_path)
     header = [
         "Filename",
@@ -86,13 +78,11 @@ def log_to_csv(csv_path, data_rows):
 
 
 def process_single_image(model, img_path, args, out_dir, csv_path, device_str):
-    """Xử lý 1 file ảnh duy nhất, xuất ảnh vào thư mục output và ghi CSV"""
     img = cv2.imread(img_path)
     if img is None:
-        print(f"[Lỗi] Không thể đọc file ảnh: {img_path}")
+        print(f"[Error] Unable to read the image: {img_path}")
         return
-
-    # Tắt autograd để tối ưu suy luận
+#turn off autograd 
     with torch.inference_mode():
         results = model.predict(
             img,
@@ -111,7 +101,7 @@ def process_single_image(model, img_path, args, out_dir, csv_path, device_str):
     csv_rows = []
     filename = p.name
 
-    # 1. TRƯỜNG HỢP OBJECT DETECTION
+    # 1. Object detection 
     if res.boxes is not None and len(res.boxes) > 0:
         for box in res.boxes:
             cls_id = int(box.cls[0])
@@ -131,7 +121,7 @@ def process_single_image(model, img_path, args, out_dir, csv_path, device_str):
                 str(out_img_path.resolve()),
             ])
 
-    # 2. TRƯỜNG HỢP IMAGE CLASSIFICATION
+    # 2. Image classification
     elif res.probs is not None:
         top1_id = int(res.probs.top1)
         top1_conf = float(res.probs.top1conf) * 100
@@ -150,9 +140,9 @@ def process_single_image(model, img_path, args, out_dir, csv_path, device_str):
             str(out_img_path.resolve()),
         ])
 
-    # 3. KHÔNG PHÁT HIỆN LỖI
+    # 3. Unable to find error
     else:
-        print("--> Không phát hiện defect nào vượt ngưỡng confidence.")
+        print("--> Not found Defect.")
         csv_rows.append([
             filename,
             "N/A",
@@ -164,18 +154,17 @@ def process_single_image(model, img_path, args, out_dir, csv_path, device_str):
         ])
 
     log_to_csv(csv_path, csv_rows)
-    print(f"[THÀNH CÔNG] Ảnh kết quả: {out_img_path.resolve()}")
-    print(f"[THÀNH CÔNG] Đã lưu log CSV: {csv_path.resolve()}")
+    print(f"[Success] Output image: {out_img_path.resolve()}")
+    print(f"[Success] Saved log CSV: {csv_path.resolve()}")
 
     if not args.no_show:
         cv2.imshow("YOLO Result", annotated_img)
-        print("[Info] Nhấn phím bất kỳ trên cửa sổ ảnh để đóng...")
+        print("[Info] Click any button in the image to close")
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
 
 def process_directory(model, dir_path, args, out_dir, csv_path, device_str):
-    """Xử lý toàn bộ ảnh trong 1 thư mục"""
     img_files = [
         os.path.join(dir_path, f)
         for f in os.listdir(dir_path)
@@ -183,12 +172,12 @@ def process_directory(model, dir_path, args, out_dir, csv_path, device_str):
     ]
 
     if not img_files:
-        print(f"[Cảnh báo] Không tìm thấy file ảnh hợp lệ nào trong: {dir_path}")
+        print(f"[Warning] No valid image files were found in: {dir_path}")
         return
 
-    print(f"--> Tìm thấy {len(img_files)} ảnh. Đang xử lý trên [{device_str}]...")
+    print(f"--> Found {len(img_files)} image(s). Executing in [{device_str}]...")
     for idx, img_path in enumerate(img_files, 1):
-        print(f"\n[{idx}/{len(img_files)}] Xử lý: {os.path.basename(img_path)}")
+        print(f"\n[{idx}/{len(img_files)}] Executeing: {os.path.basename(img_path)}")
         process_single_image(model, img_path, args, out_dir, csv_path, device_str)
 
 
@@ -196,7 +185,7 @@ def process_video_or_webcam(model, video_source, args, out_dir, csv_path, device
     """Xử lý Video file hoặc Webcam"""
     cap = cv2.VideoCapture(video_source)
     if not cap.isOpened():
-        print(f"[Lỗi] Không mở được nguồn Video/Camera: {video_source}")
+        print(f"[Error] Unable to open Video/Camera: {video_source}")
         return
 
     if isinstance(video_source, str):
@@ -211,7 +200,7 @@ def process_video_or_webcam(model, video_source, args, out_dir, csv_path, device
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     writer = cv2.VideoWriter(str(out_vid_path), fourcc, fps, (w, h))
 
-    print(f"--> Chạy stream trên [{device_str}], lưu video tại: {out_vid_path.resolve()}")
+    print(f"--> Runing stream in [{device_str}], Save video at: {out_vid_path.resolve()}")
 
     frame_idx = 0
     source_name = "webcam" if isinstance(video_source, int) else Path(video_source).name
@@ -274,11 +263,11 @@ def process_video_or_webcam(model, video_source, args, out_dir, csv_path, device
     cap.release()
     writer.release()
     cv2.destroyAllWindows()
-    print(f"[THÀNH CÔNG] Đã lưu video: {out_vid_path.resolve()}")
+    print(f"[Success] Saved Video: {out_vid_path.resolve()}")
 
 
 def run_inference(args):
-    # Xác định phần cứng
+    # hardware check
     if args.device == "cpu":
         device_str = "CPU"
     elif args.device in ["0", "cuda"] or torch.cuda.is_available():
@@ -294,31 +283,31 @@ def run_inference(args):
     print(f"--> Load Model: {args.model}")
     model = YOLO(args.model)
 
-    # Bật FP16 trực tiếp lên đối tượng model (tránh warning deprecation)
+    # turn on fp16
     if args.half and "CUDA" in device_str:
-        print("--> Bật chế độ FP16 (Half Precision) trên GPU CUDA")
+        print("--> Turn on FP16 (Half Precision) in GPU supported")
         model.to("cuda").half()
 
     source = args.source
 
     if source.isdigit():
-        print(f"--> Chế độ: WEBCAM (Index: {source})")
+        print(f"--> Mode: WEBCAM (Index: {source})")
         process_video_or_webcam(model, int(source), args, out_dir, csv_path, device_str)
 
     elif os.path.isfile(source) and source.lower().endswith(IMG_FORMATS):
-        print(f"--> Chế độ: SINGLE IMAGE ({source})")
+        print(f"--> Mode: SINGLE IMAGE ({source})")
         process_single_image(model, source, args, out_dir, csv_path, device_str)
 
     elif os.path.isfile(source) and source.lower().endswith(VID_FORMATS):
-        print(f"--> Chế độ: VIDEO FILE ({source})")
+        print(f"--> Mode: VIDEO FILE ({source})")
         process_video_or_webcam(model, source, args, out_dir, csv_path, device_str)
 
     elif os.path.isdir(source):
-        print(f"--> Chế độ: DIRECTORY ({source})")
+        print(f"--> Mode: DIRECTORY ({source})")
         process_directory(model, source, args, out_dir, csv_path, device_str)
 
     else:
-        print(f"[Lỗi] Đường dẫn không tồn tại hoặc file không hợp lệ: '{source}'")
+        print(f"[Error] The path does not exist or the file is invalid: '{source}'")
 
 
 if __name__ == "__main__":
