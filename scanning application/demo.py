@@ -9,7 +9,6 @@ import cv2
 import torch
 from ultralytics import YOLO
 
-# Supported files
 IMG_FORMATS = (".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff")
 VID_FORMATS = (".mp4", ".avi", ".mov", ".mkv", ".flv", ".wmv")
 
@@ -35,7 +34,6 @@ MAX_WIN_W, MAX_WIN_H = 1280, 720
 
 
 
-# Arguments
 
 def parse_args():
     parser = argparse.ArgumentParser(description="YOLO inference on image / folder / video / webcam")
@@ -65,7 +63,7 @@ def parse_args():
     )
     return parser.parse_args()
 
-# Helpers
+
 def resolve_device(arg):
     """Return (device for YOLO, display string, is_cuda). Falls back to CPU safely."""
     arg = (arg or "").strip().lower()
@@ -116,7 +114,7 @@ def close_windows():
     _open_windows.clear()
 
 
-#CSV
+
 class CsvLogger:
     """Opens the CSV once per run and keeps it open."""
 
@@ -198,7 +196,7 @@ def print_rows(rows):
             print(f"--> {r[COL_NAME]} | Conf: {r[COL_CONF]}% | {r[COL_MS]} ms | Device: {r[COL_DEVICE]}")
 
 
-#Stats
+
 class Stats:
     """Collects numbers for the summary printed at the end of a run."""
 
@@ -232,7 +230,7 @@ class Stats:
             print(f"Avg inference: {avg:.1f} ms/{unit} (~{1000 / avg:.1f} FPS)")
 
 
-# Image / folder
+
 def process_result(res, rel_path, args, run_dir, logger, stats, device_str, block):
     """Annotate, save, log and (optionally) preview one image result.
 
@@ -270,9 +268,8 @@ def process_result(res, rel_path, args, run_dir, logger, stats, device_str, bloc
 
 def process_image(model, img_path, predict_kw, args, run_dir, logger, stats, device_str):
     try:
-        # Passing the path (not a cv2-loaded array) lets Ultralytics read Unicode paths safely.
         res = model.predict(str(img_path), **predict_kw)[0]
-    except Exception as e:  # corrupt image, unreadable file, ...
+    except Exception as e:  
         print(f"[Error] Failed on {img_path}: {e}")
         return
 
@@ -290,7 +287,7 @@ def process_directory(model, dir_path, predict_kw, args, run_dir, logger, stats,
         for p in dir_path.rglob("*")
         if p.is_file()
         and p.suffix.lower() in IMG_FORMATS
-        and run_root not in p.resolve().parents  # don't re-process our own outputs
+        and run_root not in p.resolve().parents  
     )
 
     if not img_files:
@@ -317,7 +314,6 @@ def process_directory(model, dir_path, predict_kw, args, run_dir, logger, stats,
             close_windows()
 
 
-# Video / webcam
 def process_video_or_webcam(model, source, predict_kw, args, run_dir, logger, stats, device_str):
     """Process a video file or a webcam (source is an int index)."""
     is_cam = isinstance(source, int)
@@ -341,7 +337,6 @@ def process_video_or_webcam(model, source, predict_kw, args, run_dir, logger, st
     frame_idx = 0
 
     try:
-        # stream=True -> generator, frames are processed one by one (low memory)
         for res in model.predict(source=source if is_cam else str(source), stream=True, **predict_kw):
             frame_idx += 1
             annotated = res.plot()
@@ -374,9 +369,8 @@ def process_video_or_webcam(model, source, predict_kw, args, run_dir, logger, st
 
 
 
-# Main#
 def run_inference(args):
-    # 1. Work out what kind of source we have BEFORE loading the model
+del
     source = args.source
     src_path = Path(source)
 
@@ -392,18 +386,16 @@ def run_inference(args):
         print(f"[Error] The path does not exist or the file is invalid: '{source}'")
         sys.exit(1)
 
-    # 2. Hardware
+
     device, device_str, use_cuda = resolve_device(args.device)
     half = args.half and use_cuda
     if args.half and not use_cuda:
         print("[Warning] --half is only supported on GPU, ignoring it")
 
-    # 3. Output
     run_dir = Path(args.out_dir) / f"run_{datetime.now():%Y%m%d_%H%M%S}"
     run_dir.mkdir(parents=True, exist_ok=True)
     csv_path = run_dir / args.csv_name
 
-    # 4. Model
     print(f"--> Load Model: {args.model}")
     model = YOLO(args.model)
 
@@ -411,7 +403,7 @@ def run_inference(args):
     if half:
         print("--> FP16 (Half Precision) enabled")
 
-    # 5. Run
+
     stats = Stats()
     unit = "image"
 
